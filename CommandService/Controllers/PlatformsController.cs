@@ -33,7 +33,7 @@ namespace CommandService.Controllers
         [HttpPost]
         public ActionResult TestInboundConnection()
         {
-            Console.WriteLine("--> Inbound POST@Command Service");
+            Console.WriteLine("--> Inbound POST @Command Service");
 
             return Ok("Inbound test from PlatformsController in CommandService");
         }

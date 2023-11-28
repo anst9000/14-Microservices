@@ -13,29 +13,54 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.OpenApi.Models;
 using PlatformService.Data;
+using PlatformService.SyncDataServices.Http;
 
 namespace PlatformService
 {
     public class Startup
     {
-        public Startup(IConfiguration configuration)
+        public IConfiguration Configuration { get; }
+
+        private readonly IWebHostEnvironment _env;
+
+        public Startup(IConfiguration configuration, IWebHostEnvironment env)
         {
             Configuration = configuration;
+            _env = env;
         }
 
-        public IConfiguration Configuration { get; }
 
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddDbContext<AppDbContext>(
-                opt => opt.UseInMemoryDatabase("InMem")
-            );
+            if (_env.IsProduction())
+            {
+                Console.WriteLine("--> Using SqlServer DB");
+
+                services.AddDbContext<AppDbContext>(
+                    opt => opt.UseSqlServer(Configuration.GetConnectionString("PlatformsConnection"))
+                );
+            }
+            else
+            {
+                Console.WriteLine("--> Using InMem DB");
+
+                services.AddDbContext<AppDbContext>(
+                    opt => opt.UseInMemoryDatabase("InMem")
+                );
+            }
+
+            services.AddScoped<IPlatformRepo, PlatformRepo>();
+            services.AddHttpClient<ICommandDataClient, HttpCommandDataClient>();
 
             services.AddControllers();
+            services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
+
             services.AddSwaggerGen(c =>
             {
                 c.SwaggerDoc("v1", new OpenApiInfo { Title = "PlatformService", Version = "v1" });
             });
+
+            Console.WriteLine($"--> CommandService endpoint {Configuration["CommandService"]}");
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -44,10 +69,10 @@ namespace PlatformService
             {
                 app.UseDeveloperExceptionPage();
                 app.UseSwagger();
-                app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "PlatformService v1"));
+                app.UseSwaggerUI(c => c.SwaggerEndpoint(" / swagger / v1 / swagger.json", "PlatformService v1"));
             }
 
-            app.UseHttpsRedirection();
+            // app.UseHttpsRedirection();
 
             app.UseRouting();
 
@@ -57,6 +82,8 @@ namespace PlatformService
             {
                 endpoints.MapControllers();
             });
+
+            PrepDb.PrepPopulation(app, _env.IsProduction());
         }
     }
 }
